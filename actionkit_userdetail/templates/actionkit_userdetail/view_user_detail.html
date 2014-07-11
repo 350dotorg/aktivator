@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+{% load helpful_tags %}
+
+<html>
+<head>
+  {% block head %}
+  <script type="text/javascript" src="/static/chosen/chosen.jquery.js"></script>
+  <link rel="stylesheet" type="text/css" href="/static/chosen/chosen.css" />
+  <script type="text/javascript" src="/static/chosen/chosen.jquery.js"></script>
+  <script type="text/javascript">
+    $(window).load(function() {
+      $("select[multiple]").chosen();
+    });
+
+  </script>
+  <script type="text/javascript">
+    $(window).load(function() {
+      $("#num_results").text($("tr.gradeA").length);
+      $("table.datatable").dataTable({
+        "bJQueryUI": true,
+        "sPaginationType": "full_numbers"
+      });
+    });
+  </script>
+  <style type="text/css">
+    li.bsmListItem {
+      border-radius: 5px;
+      margin: 2px 0;
+    }
+    a.bsmListItemRemove {
+      color: #C95A00;
+      font-size: 0.75em;
+    }
+    div.includeSet {
+      background-color: #EEE;
+      border-radius: 9px;
+    }
+  </style>
+  {% endblock %}
+</head>
+
+<body>
+
+{% block content %}
+
+<div id="person-details" class="row">
+  <div class="span12 header-compact" style="margin-bottom: 2em">
+    <h2>{{ agent }}</h2>
+
+    <a target="_blank" 
+       href="{{ ACTIONKIT_URL }}/admin/core/user/{{ member_id }}/"
+       class="btn">View/Edit in Actionkit</a>
+
+  </div>
+
+  <div class="span2" id="profile_photo">
+    <div class="inner-border">
+      <img src="/static/default-portrait.gif" />
+    </div>
+  </div>
+  <div class="span5" id="content-box">
+    <div class="inner-border">
+      <p>
+	<strong>Name:</strong> {{ agent }}
+      </p>
+      <p>
+	<strong>Email:</strong> {{ agent.email }}
+      </p>
+      <p>
+	<strong>Phone:</strong> {{ agent.phone_number }}
+      </p>
+      <p>
+	<strong>ZIP:</strong> {{ agent.zip }}
+      </p>
+      <p>
+	<strong>Address:</strong> {{ agent.formatted_address }}
+      </p>
+      {% for userfield in callout_userfields %}
+      {% with userfield.name as field %}
+      <p>
+	<strong>{{ field|title }}:</strong> {{ agent|getattr:field|default:"None" }}
+      </p>
+      {% endwith %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="span5">
+    <div class="inner-border">
+      <p>
+	<strong>Lifetime donations:</strong> ${{ total_donations }}
+      </p>
+      <p>
+        <strong>Next upcoming donation:</strong> {% with upcoming_recurring_donations.0 as recurrence %}{% if recurrence %}${{ recurrence.amount }} on {{ recurrence.start }}{% else %}None{% endif %}{% endwith %}
+      </p>
+      <p>
+	<strong>Lifetime email opens:</strong> {{ opens|length }}
+      </p>
+      <p>
+	<strong>Lifetime email clicks:</strong> {{ clicks|length }}
+      </p>
+      <p>
+	<strong>Lifetime email sends:</strong> {{ sends.count }}
+      </p>
+      <p>
+	<strong>Tags:</strong>
+	{{ agent_tags|joined_by:", " }}
+      </p>
+    </div>
+  </div>
+</div>
+
+<hr />
+
+<div class="row">
+  <div class="span12">
+    <ul class="nav nav-tabs">
+      <li><a href="#action-history" data-toggle="tab">Action History</a></li>
+      <li><a href="#donation-history" data-toggle="tab">Donation History</a></li>
+      <li><a href="#mailing-history" data-toggle="tab">Mailing History</a></li>
+      <li><a href="#user-fields" data-toggle="tab">User Fields</a></li>
+    </ul>
+
+    <div class="tab-content">
+
+    <div class="tab-pane active" id="action-history">
+      <div class="datatables_wrapper">
+	<table class="display datatable" id="action_data">
+	  <thead>
+	    <tr>
+	      <th>Took Action On</th>
+	      <th>Page ID</th>
+	      <th>Page Title</th>
+	      <th>Page Type</th>
+	    </tr>
+	  </thead>
+	  <tbody>
+	    {% for action in actions %}
+	    <tr>
+	      <td>
+		{{ action.created_at|date }} 
+	      </td>
+	      <td>
+		<a target="_blank"
+		   href="{{ ACTIONKIT_URL }}/admin/core/page/{{ action.page.id }}/">
+		  {{ action.page.id }}
+		</a>
+	      </td>
+	      <td>{{ action.page.title|default:action.page.name }}</td>
+	      <td>
+		{{ action.page.type }}
+	      </td>
+	    </tr>
+	    {% endfor %}
+	  </tbody>
+	</table>
+      </div>
+    </div>
+
+    <div class="tab-pane" id="donation-history">
+      <div class="datatables_wrapper">
+	<table class="display datatable" id="donation_data">
+	  <thead>
+	    <tr>
+	      <th>Donated On</th>
+	      <th>Amount</th>
+	      <th>Status</th>
+	      <th>Page</th>
+	    </tr>
+	  </thead>
+	  <tbody>
+	    {% for order in orders %}
+	    <tr>
+	      <td>
+		{{ order.created_at|date }} 
+	      </td>
+	      <td>
+		${{ order.total|floatformat:2 }}
+	      </td>
+	      <td>
+		{{ order.status }}
+	      </td>
+	      <td>
+		{{ order.action.page.title }}
+	      </td>
+	    </tr>
+	    {% endfor %}
+	  </tbody>
+	</table>
+      </div>
+    </div>
+
+    <div class="tab-pane" id="mailing-history">
+      <div class="datatables_wrapper">
+	<table class="display datatable" id="mailing_data">
+	  <thead>
+	    <tr>
+	      <th>Sent On</th>
+	      <th>Subject</th>
+	      <th>Opens</th>
+	      <th>Clicks</th>
+	    </tr>
+	  </thead>
+	  <tbody>
+	  </tbody>
+	</table>
+      </div>
+    </div>
+
+    <div class="tab-pane" id="user-fields">
+      <div class="datatables_wrapper">
+	<table class="display datatable" id="user_fields_data">
+	  <thead>
+	    <tr>
+	      <th>Name</th>
+	      <th>Value</th>
+	    </tr>
+	  </thead>
+	  <tbody>
+	  </tbody>
+	</table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script type="text/javascript">
+  $(window).load(function() {
+    $.getJSON("{% url 'userdetail_mailing_history' agent.id %}", function(data) {
+      var table = $("#mailing_data").dataTable();
+      $.each(data, function(i, row) {
+        table.fnAddData([row.mailed_at, row.subject_text,
+                         row.opens.length, row.clicks.length]);
+      });
+    });
+    $.getJSON("{% url 'userdetail_user_fields' agent.id %}", function(data) {
+      var table = $("#user_fields_data").dataTable();
+      $.each(data, function(i, row) {
+        table.fnAddData([row.name, row.value]);
+      });
+    });
+  });
+</script>
+
+<script type="text/javascript">
+(function($) {
+
+  var agentId = '{{ agent.id }}';
+  var fetchUrl = '{% url 'userdetail_supplemental_details_json' agent.id %}'
+  fetchSupplementalData(1);
+
+  function fetchSupplementalData(attempt) {
+
+    $.getJSON(fetchUrl, function(data) {
+
+      var dataStatus = data['status'];
+      if (!dataStatus) {
+        return;
+      }
+      var extraDetailsContainer = $('#contact-extra-details').first();
+      if (extraDetailsContainer.length) {
+        extraDetailsContainer.empty();
+      } else {
+        extraDetailsContainer = $('<div />',
+          {'class': 'span5', 'style': 'margin-top: 1em; max-height: inherit',
+           'id': 'contact-extra-details'});
+      }
+
+      var personDetails = $('#person-details');
+      personDetails.append(extraDetailsContainer);
+
+      if (dataStatus === 202 || dataStatus === 500) {
+        setTimeout(function() { fetchSupplementalData(attempt+1); }, 30000);
+        return;
+      }
+
+      var imageElt = $('#profile_photo img').first();
+      if (imageElt.length && data['photos']) {
+        imageElt.hover(function() { imageElt.css('cursor', 'pointer'); },
+                       function() { imageElt.css('cursor', 'default'); });
+        var imageIdx = 0;
+        var photos = data['photos'];
+        photos.sort(function(a, b) {
+          var x = a.typeId;
+              y = b.typeId;
+          if (x === y) {
+            // can have multiple results of same type
+            // stable sort if so
+            return a.url < b.url ? -1 : a.url > b.url ? 1 : 0;
+          }
+          // linkedin < facebook < everything else
+          if (x === 'linkedin') { return -1; }
+          if (y === 'linkedin') { return 1; }
+          if (x === 'facebook') { return -1; }
+          if (y === 'facebook') { return 1; }
+          return x < y ? -1 : x > y ? 1 : 0;
+        });
+        function setPhoto(photo) {
+          imageElt.attr('src',   photo['url']);
+          imageElt.attr('title', photo['typeName']);
+        }
+        imageElt.click(function() {
+          imageIdx = (imageIdx + 1) % photos.length;
+          setPhoto(photos[imageIdx]);
+        });
+        setPhoto(photos[0]);
+      }
+
+      var organizations = [];
+      if (data['organizations']) {
+        $.each(data['organizations'], function(i, org) {
+          if (org['name']) {
+            organizations.push(org['name']);
+          }
+        });
+      }
+
+      var socialLinks = [];
+      if (data['socialProfiles']) {
+        $.each(data['socialProfiles'], function(i, profile) {
+          var typeName = profile['typeName'];
+          var url = profile['url'];
+          if (typeName && url) {
+            socialLinks.push({typeName: typeName, url: url});
+          }
+        });
+      }
+
+      if (organizations.length > 0) {
+        var container = $('#content-box div').first();
+        container.append(
+            $('<p />')
+            .append($('<strong />').text('Organizations: '))
+            .append($('<span />').text(organizations.join(', '))));
+        container.css('min-height', '220px');
+        container.css('max-height', '220px');
+      }
+
+      if (socialLinks.length > 0) {
+        var tabs = $('.nav-tabs').first();
+        tabs.append(
+            $('<li />')
+            .append(
+              $('<a />', {'data-toggle': 'tab', href: '#social-links'})
+              .text('Social')));
+
+        var tabContentContainer = $('.tab-content').first();
+        var ul = $('<ul />');
+        socialLinks.sort(function(a, b) {
+          var x = a.typeName,
+              y = b.typeName;
+          return x < y ? -1 : x > y ? 1 : 0;
+        });
+        $.each(socialLinks, function(i, linkData) {
+          ul.append(
+            $('<li />')
+            .append(
+              $('<a />', {href: linkData.url}).text(linkData.typeName)));
+        });
+
+        tabContentContainer.append(
+            $('<div />', {id: 'social-links', 'class': 'tab-pane'})
+            .append(ul));
+      }
+    });
+  }
+})(jQuery);
+</script>
+
+{% endblock %}
+</body>
+</html>

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% load url from future %}
+
+{% block content %}
+
+  <h1>{{ report.report_ptr.name }}</h1>
+  <div>{{ report.report_ptr.description }}</div>
+  
+  <pre>{{ report.sql }}</pre>
+
+  <p>
+  Created on {{ report.report_ptr.created_at }}
+  </p>
+
+  <p>
+  Status: {{ status.details.status }}
+  </p>
+  {% if status.details.status == "complete" %}
+  <p>
+    Sent to {{ status.params.email }} at {{ status.updated_at }}
+  </p>
+  <p>
+    Didn't see the email?  <a href="{{ ACTIONKIT_URL }}{{ status.details.download_uri }}">Click here to download it</a> or re-run your search.
+  </p>
+  {% endif %}
+{% endblock %}

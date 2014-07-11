@@ -1,0 +1,12 @@
+
+  <select
+     id="template_{{ clause.name }}"
+     name="{{ clause.name }}" data-placeholder="{{ clause.display_name }}"
+     multiple="multiple"
+     >
+    {% for item in clause.get_options %}
+    <option value="{{ item }}">
+      {{ item }}
+    </option>
+    {% endfor %}
+  </select>

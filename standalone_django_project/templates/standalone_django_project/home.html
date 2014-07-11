@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% load url from future %}
+
+{% block content %}
+<div class="row">
+  <div class="span12">
+    <h1>I want to...</h1>
+  </div>
+</div>
+
+<div class="row">
+  <div class="span12">
+    <form method="GET" action="{% url 'usersearch_search' %}">
+      <input type="submit" class="btn" value="Search for members" />
+    </form>
+
+    <form method="GET" action="{% url 'userdetail_jump_to_member' %}">
+      <input type="submit" class="btn" value="Jump to member" />
+      <input style="margin-bottom: 0" name="member" 
+             placeholder="Enter an ID or email address" />
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,124 @@
+The code comes with a simple Django project and Heroku configuration that can be used 
+to get a hosted version quickly up and running.  The configuration will be suitable
+for demo purposes and for light internal usage.  
+
+Note that HTTPS is a strict requirement for hosting a Raplet.  Adding an HTTPS endpoint
+on Heroku costs $20/month.  Other than that, the application is fully functional on Heroku
+without any additional costs or usage beyond the free tier -- although in several places 
+this involves trading performance for ease of setup.
+
+If you already have a wildcard SSL certificate, are comfortable
+configuring Apache with mod_ssl, and are willing to maintain your own
+WSGI server / database / etc, you can also install the
+application on your own server via Apache/mod_wsgi or another
+configuration with an Apache/mod_ssl HTTPS frontend.  This will likely
+be more cost-effective than Heroku's $20/month SSL endpoint.
+
+That said -- and especially if you are hosting the application
+yourself instead of using Heroku -- if you plan to use this heavily
+(e.g. a large number of simultaneous staff users activating the
+Raplet, or with a custom query that is very database-intensive) I
+recommend examining the configuration and making changes to suit your
+needs.
+
+The Django project will provide:
+
+* A Bootstrap-based base template, a login view, and a homepage
+* All functionality locked down to logged-in users only
+* All logged in users have full access to install and use the Raplet
+* Django Flat Pages are installed so you can add your own help pages, etc
+* All site templates can be modified through the web using django-dbtemplates
+* Through-the-web access to Django's Admin Site to manage users, templates, flat pages, and raplet configuration
+
+The core functionality is provided in an isolated Django app called "actionkit_raplet".  This
+can be integrated into any larger Django project, if the provided Django project does not
+meet your needs.
+
+Quick-Start on Heroku
+=====================
+
+You will need to create an account on Heroku and install the Heroku Toolbelt.  Then, from
+a terminal:
+
+.. code-block:: bash
+
+  git clone git://github.com/350dotorg/aktivator.git
+  cd aktivator
+  heroku apps:create
+  heroku plugins:install git://github.com/ddollar/heroku-config.git
+  heroku addons:add cleardb
+  git push heroku master
+  python standalone_django_project/required_environ.py .env
+  heroku config:push
+  heroku domains:add $(grep SITE_DOMAIN .env | tr '=' ' ' | cut -f2 -d' ')
+  heroku config:set HEROKU_DOMAIN="$(git remote -v | grep heroku | cut -f2 -d':' | cut -f1 -d'.' | uniq).herokuapp.com"
+  heroku run python manage.py syncdb
+  heroku run python manage.py migrate
+  heroku open
+
+You will be prompted for input a few times during the installation -- for example
+to provide database credentials to your Actionkit instance, and to create
+a new Django superuser to log in to the site.  When this is done, a web browser
+will open and prompt you to log in.  (You may need to configure your DNS for the site domain
+you specified to point to the Heroku app, and then visit the app from that domain, 
+in order to see it successfully.)
+
+You should log in using the username and password for the Django superuser that you 
+just created.
+
+After logging in, visit /admin/actionkit/test_connection/ in the browser to confirm
+that your Actionkit database and API connection are properly configured.
+
+== Configuration ==
+
+
+== Debugging ==
+
+If something goes wrong, you can run the following command in a terminal to view the
+application's logs as you interact with the site:
+
+.. code-block:: bash
+
+  heroku logs -t
+
+That might provide enough information to figure out the problem.  If not, you can 
+switch the site into debug mode by running:
+
+.. code-block:: bash
+
+  heroku config:set DJANGO_DEBUG=1 DJANGO_DEBUG_TOOLBAR=1 INTERNAL_IPS=*
+
+This will cause the site to display detailed debugging information in the browser
+when any error occurs.  It will also cause the site to have a "debug mode" sidebar
+that can be expanded on any page to view detailed SQL logs and other information.
+
+When you're finished debugging, you should take the site out of debug mode by running:
+
+{{{
+heroku config:unset DJANGO_DEBUG DJANGO_DEBUG_TOOLBAR INTERNAL_IPS
+}}}
+
+Quick-Start for Local Development
+=================================
+
+To develop and run the system locally, or on your own server, looks
+similar to running on Heroku.  Note that in addition to your primary
+database (for which postgres is recommended) you will need an extra
+MySQL database whose connection string is specified in the environment
+under ACTIONKIT_DUMMY_DATABASE_URL.  This database does not need any 
+tables; it is used under the hood to execute Django ORM queries to 
+convert them into raw SQL for Actionkit.
+
+Deficiencies
+============
+
+As mentioned above, this setup lacks several important components of a secure, 
+maintainable production infrastructure.  For example:
+
+* Static files are served locally from the Heroku environment instead of e.g. S3
+* No system is set up to capture access and error logs (e.g. Papertrail) or monitor performance (e.g. New Relic)
+* HTTPS is not configured
+
+If you plan on leaving this web application running for a long time and using it
+heavily, setting up your own installation instead of relying on this quick-start
+guide is highly recommended.

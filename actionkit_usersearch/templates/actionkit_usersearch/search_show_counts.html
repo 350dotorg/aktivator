@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% load helpful_tags %}
+
+  {% block content %}
+
+{% if not error %}
+<div class="row">
+  <div class="span12">
+    <h1>Found: <span id="num_results">{{ count }}</span> people</h1>
+    <div class="results-header">
+      Searched for people who match::
+      <pre>{{ query.human_query }}</pre>
+    </div>
+
+    <pre>{{ query.raw_sql }}</pre>
+  </div>
+</div>
+{% else %}
+<div class="row">
+  <div class="span12">
+    <h1>Sorry, there was an error.</h1>
+  </div>
+</div>
+
+<div class="row">
+  <div class="span12">
+    {{ error }}
+  </div>
+</div>
+{% endif %}
+<div class="row">
+  <div class="span12">
+
+<form method="POST" action="{% url 'usersearch_create_report' %}">
+  {% csrf_token %}
+
+  {% for key, values in params.iterlists %}
+  {% for value in values %}
+  <input type="hidden" name="{{ key }}" value="{{ value }}" />
+  {% endfor %}
+  {% endfor %}
+  
+  <input type="submit" class="btn" value="Get CSV with full results" />
+</form>
+
+  </div>
+</div>
+{% endblock %}
+

@@ -1,0 +1,701 @@
+{% extends "base.html" %}
+
+{% load url from future %}
+
+<html>
+<head>
+  {% block head %}
+  <script type="text/javascript" src="/static/chosen/chosen.jquery.js"></script>
+  <script type="text/javascript" src="/static/throbber.js"></script>
+  <script type="text/javascript">
+
+  function queryToJSON() {
+    var query = []; 
+    $(".and-group").each(function() { 
+      var clauses = []; 
+      $(this).find(".where-clause").each(function() { 
+        var clause = {}; 
+        clause.term = $(this).find(".paramset").val(); 
+        if( !clause.term ) return;
+        clause.type = $(this).find(".istoggle").val() === "1" ? "include" : "exclude"; 
+        $(this).find(".searchParam").each(function() {
+          clause[$(this).data("original-name")] = $(this).val();
+        });
+        clauses.push(clause);
+      });
+    query.push(clauses); 
+    });
+
+    query = {"clauses": query};
+    if( $("input[name=user_name]").val() ) {
+      query.user_name = $("input[name=user_name]").val();
+    }
+    if( $("input[name=user_email]").val() ) {
+      query.user_email = $("input[name=user_email]").val();
+    }
+    if( $("input[name=user_id]").val() ) {
+      query.user_id = $("input[name=user_id]").val();
+    }
+    if( $("input[name=subscription_all_users]").is(":checked") ) {
+      query.include_unsubscribed_users = true;
+    }
+
+    query.columns = [];
+    $("input[name=column]:checked").each(function() {
+      query.columns.push($(this).attr("value"));
+    });
+    return query;
+  };
+
+  function addSet(setGroup, anchor) {
+    var container = $(anchor).closest(".and-group");
+console.log(anchor);
+    var children = container.find(".paramset");
+    var index = container.index(".and-group");
+    var options = children[0].innerHTML;
+    container.find(".includeSet").append("<br/><br/><br/><div class='addSet'><strong>And:</strong></div><br/>");
+    var wrapper = $("<div />").addClass("where-clause").appendTo(container.find(".includeSet"));
+    $("<select />").attr("data-placeholder", "Choose a search parameter").addClass("paramset")
+       .attr("name", setGroup+":"+index)
+       .append(options)
+       .appendTo(wrapper)
+       .chosen();
+  };
+  function addSetOr(setGroup) {
+    var index = $(".and-group").length;
+    var wrapper = $("<div />").addClass("and-group").html($("#template_and-group").html());
+    wrapper.insertAfter(".and-group:last");
+    wrapper.find("select.paramset")
+       .attr("name", setGroup+":"+index)
+       .chosen();
+    $("<div class='addSetOr'><strong>Or:</strong></div><br/>").insertBefore(wrapper);
+  };
+  </script>
+  <link rel="stylesheet" type="text/css" href="/static/chosen/chosen.css" />
+  <link rel="stylesheet" type="text/css" 
+        href="/static/jquery/jquery.autocomplete.css" />
+  <link rel="stylesheet" type="text/css"
+        href="/static/jquery-ui-1.10.2.custom.min.css" />
+  <script type="text/javascript" src="/static/jquery/jquery.autocomplete.js"></script>
+  <script type="text/javascript" src="/static/bootstrap-modal.js"></script>
+  <script type="text/javascript" src="/static/bootstrap-collapse.js"></script>
+  <link rel="stylesheet" type="text/css" href="/static/chosen/chosen.css" />
+  <script type="text/javascript">
+    ajaxResponseHandlers = {};
+    ajaxResponseHandlers["{% url 'usersearch_show_sql' %}"] = function(response) {
+      $("#rawSqlModal").find("[data-bind=human_query]").text(response.human_query);
+      $("#rawSqlModal").find("[data-bind=raw_sql]").text(response.raw_sql);
+      $("#rawSqlModal").modal();
+    };
+
+    ajaxResponseHandlers["{% url 'usersearch_create_report' %}"] = function(response) {
+      $("#reportInfoModal").find("[data-bind=human_query]").text(response.human_query);
+      $("#reportInfoModal").find("[data-bind=email_to]").text(response.email_to);
+      $("#reportInfoModal").find("[data-bind=email_subject]").text(response.email_subject);
+      $("#reportInfoModal").find("[data-bind=redirect]").text(response.redirect).attr("href", response.redirect);
+      $("#reportInfoModal").find("[data-bind=error_message]").text(response.error_message);
+      if( response.error ) {
+        $("#reportInfoModal").find(".noError").hide();
+        $("#reportInfoModal").find(".yesError").show();
+      } else {
+        $("#reportInfoModal").find(".noError").show();
+        $("#reportInfoModal").find(".yesError").hide();
+      }
+      $("#reportInfoModal").modal();
+    };
+    ajaxResponseHandlers["{% url 'usersearch_show_counts' %}"] = function(response) {
+      $("#queryCountModal").find("[data-bind=human_query]").text(response.human_query);
+      $("#queryCountModal").find("[data-bind=count]").text(response.count);
+      $("#queryCountModal").find("[data-bind=error]").text(response.error);
+      if( response.error ) {
+        $("#queryCountModal").find(".noError").hide();
+        $("#queryCountModal").find(".yesError").show();    
+      } else {
+        $("#queryCountModal").find(".noError").show();
+        $("#queryCountModal").find(".yesError").hide();
+      }
+      $("#queryCountModal").modal();
+
+    };
+
+    $(window).load(function() {
+      $("form").live("submit", function() {
+        json = queryToJSON();
+        $.ajax($(this).attr("action"), {"data": JSON.stringify(json), "contentType": "application/json", "type": "POST", "success": ajaxResponseHandlers[$(this).attr("action")]});
+        return false;
+      });
+
+      $(".includeSet.include select.paramset").chosen();
+
+      $("select.paramset").live("change", function() {
+
+        // Make sure no datepicker ghosts remain behind after their inputs have been removed/hidden
+        $(".hasDatepicker").datepicker("hide");
+
+        var that = $(this).parent();
+        that.find(".searchParam").parent(".searchParamContainer").remove();
+        var val = $(this).val();
+        var newEl = $("#template_" + val).clone();
+        newEl.data("original-name", newEl.attr("name"));
+
+        newEl.removeAttr("id").addClass("searchParam");
+        var newElWrapper = $("<div>").addClass("searchParamContainer");
+        if (newEl.hasClass('no-choice')) {
+          var hiddenInput = newEl.find('input[type=hidden]');
+          hiddenInput.attr('name', $(this).attr('name') + "_" + newEl.attr("name"));
+        } else {
+          newEl.attr("name", $(this).attr("name") + "_" + newEl.attr("name"));
+          var isToggleElt = $("#template_istoggle").clone();
+          isToggleElt.removeAttr("id");
+          isToggleElt.show();
+          isToggleElt.appendTo(newElWrapper);
+          isToggleElt.attr("name", newEl.attr("name") + "_" + isToggleElt.attr("name"));
+        }
+        newEl.appendTo(newElWrapper);
+        newEl.show();
+        newElWrapper.appendTo(that);
+        if( newEl[0].tagName == "SELECT" ) {
+          if( newEl.data("filtertype") == "state" ) {
+            newEl.bind("akcrm:findfields", function() {
+              var data = newEl.closest(".and-group").find("select[name$=_country]").data("available_states");
+              newEl.html("<option value=''></option>");
+              $.each(data, function(i, n) { 
+                var group = $("<optgroup>").attr("label", i);
+                 $.each(n, function(j, m) {
+                  $("<option>").attr("value", m).text(m).appendTo(group);
+                });
+                group.appendTo(newEl);
+              });
+              newEl.trigger("liszt:updated");
+            });
+            newEl.removeClass("chzn-done").chosen();
+            newEl.trigger("akcrm:findfields");
+          } else if( newEl.data("filtertype") == "country" ) {
+            newEl.removeClass("chzn-done").chosen().change(function() {
+              var countries = newEl.val();
+              if( countries.length ) {
+                newEl.closest(".and-group").find("option[value=state]").removeAttr("disabled");
+                var country_string = "country=" + countries.join("&country=");
+                $.getJSON("{% url 'choices_states' %}?" + country_string, 
+                  function(data) {
+                    newEl.data("available_states", data);
+                    newEl.closest(".and-group").find("select[name$=_state]").trigger("akcrm:findfields");
+                });
+              }
+            });
+          } else {
+            newEl.removeClass("chzn-done").chosen();
+          }
+        } else if (newEl.attr('placeholder') === 'MM/DD/YYYY') {
+          newEl.datepicker();
+        } else {
+          var autocompleteUrl = newEl.attr('autocomplete');
+          if (autocompleteUrl) {
+            newEl.autocomplete({
+                url: autocompleteUrl,
+                remoteDataType: 'json',
+                minLength: 3,
+                useCache: false
+                });
+          }
+        }
+	if( newEl.data("paired-with") ) {
+	  var pairedEl = $("#template_" + newEl.data("paired-with"));
+	  if( pairedEl ) {
+            pairedEl = pairedEl.clone().addClass("searchParam");
+            pairedEl.data("original-name", pairedEl.attr("name"));
+            pairedEl.attr("name", $(this).attr("name") + "_" + pairedEl.attr("name"));
+
+            newEl.data("paired-with", pairedEl.attr("name"));
+            pairedEl.removeAttr("id");
+            newElWrapper.append(pairedEl);
+            if (pairedEl.attr('placeholder') === 'MM/DD/YYYY') {
+              pairedEl.datepicker();
+            } 
+          }
+        } 
+      });
+    });
+  </script>
+  <style type="text/css">
+    .chzn-choices .search-choice span, .chzn-container .chzn-results li {
+      line-height: 150% !important;
+    }
+    .and-group {
+      border: 1px solid gray;
+      border-radius: 5px;
+      padding: 0 10px 8px 10px;
+      margin-bottom: 15px;
+    }
+    .includeSet .chzn-container, .searchParamContainer {
+      float: left;
+      display: inline;
+      padding-right: 5px;
+    }
+    .searchParamContainer .chzn-choices {
+      border-radius: 2px;
+    }
+    .addSet, .addSetOr {
+      display: block;
+      clear: both;
+    }
+    li.bsmListItem {
+      border-radius: 5px;
+      margin: 2px 0;
+    }
+    a.bsmListItemRemove {
+      color: #C95A00;
+      font-size: 0.75em;
+    }
+    div.includeSet {
+      background-color: #EEE;
+      border-radius: 9px;
+      clear: both;
+    }
+    div.input {
+      margin-left: 0;
+    }
+    label {
+      padding-right: 5px;
+      width: auto;
+    }
+  </style>
+  {% endblock %}
+</head>
+<body>
+{% block nav %}
+<li class="active"><a href="/">New Search</a></li>
+{% if request.PERMISSIONS.add_allowed_tags %}
+<li><a href="{% url 'allowed_tags' %}">Manage Tags</a></li>
+{% endif %}
+{% if request.PERMISSIONS.search_saved %}
+<li><a href="{% url 'search_saved' request.user.username %}">Saved Searches</a></li>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+
+<div id="reportInfoModal" class="modal hide fade">
+  <div class="modal-header">
+    <a href="#" class="close" data-dismiss="modal">×</a>
+    <h3>We're working on it.</h3>
+  </div>
+  <div class="yesError modal-body">
+    <p>There was an error.  :-(</p>
+    <p><span data-bind="error_message">error_message</span></p>
+  </div>
+
+  <div class="noError modal-body">
+    <p>
+      You searched for: <span data-bind="human_query">human_query</span>
+    </p>
+
+    <p>An email containing the CSV file you requested
+      will be sent to <span data-bind="email_to">email_to</span> 
+      from "Actionkit Reports".</p>
+    <p>The email's subject will be "<span data-bind="email_subject">email_subject</span>"</p>
+    <p>You can also check on the status of your report at this address:
+      <a data-bind="redirect"></a>
+    </p>
+  </div>
+  <div class="modal-footer">
+    <a href="#" data-dismiss="modal" class="btn">Close</a>
+  </div>
+</div>
+
+
+<div id="queryCountModal" class="modal hide fade">
+  <div class="modal-header">
+    <a href="#" class="close" data-dismiss="modal">×</a>
+    <h3>The number you requested.</h3>
+  </div>
+  <div class="modal-body">
+    <p>
+      You searched for: <span data-bind="human_query">human_query</span>
+    </p>
+
+    <p class="noError">
+      This search will return <span data-bind="count">count</span> members.
+    </p>
+    <p class="yesError">
+      There was an error. :-( <span data-bind="error">error</span>
+    </p>
+  </div>
+  <div class="modal-footer">
+    <a href="#" data-dismiss="modal" class="btn">Close</a>
+  </div>
+</div>
+
+
+<div id="rawSqlModal" class="modal hide fade">
+  <div class="modal-header">
+    <a href="#" class="close" data-dismiss="modal">×</a>
+    <h3>Here's the SQL for your search.</h3>
+  </div>
+  <div class="modal-body">
+    <p>
+      You searched for: <span data-bind="human_query">human_query</span>
+    </p>
+
+    <p>The raw SQL for this search is here:</p>
+
+    <pre style="white-space: pre-wrap;       /* css-3 */
+                white-space: -moz-pre-wrap;  /* Mozilla, since 1999 */
+                white-space: -pre-wrap;      /* Opera 4-6 */
+                white-space: -o-pre-wrap;    /* Opera 7 */
+                word-wrap: break-word;       /* Internet Explorer 5.5+ */"
+                word-break: break-word;
+         data-bind="raw_sql">raw_sql</pre>
+
+    <p>
+      You can copy the above SQL into an Actionkit report or database client.
+    </p>
+  </div>
+  <div class="modal-footer">
+    <a href="#" data-dismiss="modal" class="btn">Close</a>
+  </div>
+</div>
+
+{% if homepagehtml %}
+<div id="homepage_html">
+  {{ homepagehtml|safe }}
+</div>
+{% endif %}
+
+<div class="row">
+<div class="span12">
+<h1>Actionkit User Search</h1>
+</div>
+</div>
+<div class="row">
+
+<div class="span12">
+<form method="POST" id="search_form">
+  {% csrf_token %}
+  <div style="clear: both; padding-bottom: 15px;">
+    <input type="submit" class="btn"
+           formaction="{% url 'usersearch_show_counts' %}" 
+           value="Just the counts, please" />
+    <input type="submit" class="btn"
+           formaction="{% url 'usersearch_show_sql' %}" 
+           value="Show raw SQL code" />
+    <input type="submit" class="btn"
+           formaction="{% url 'usersearch_create_report' %}" 
+           value="Get CSV with full results" />
+  </div>
+  <fieldset>
+    <div class="clearfix">
+      <div style="float: left; padding-right: 15px;">
+        <div class="input">
+          <label for="user_name">Search by name:</label>
+          <input type="text" name="user_name" />
+        </div>
+      </div>
+      <div style="float: left; padding-right: 15px;">
+        <div class="input">
+          <label for="user_email">And/or email:</label>
+          <input type="text" name="user_email" />
+        </div>
+      </div>
+      <div style="float: left; padding-right: 15px;">
+        <div class="input">
+          <label for="user_id">And/or Actionkit ID:</label>
+          <input type="text" name="user_id" />
+        </div>
+      </div>
+    </div>
+    <div class="clearfix">
+
+      <div style="display:none" id="searchTemplates">
+
+        <div id="template_and-group">
+          <br/>
+          <div><strong>Search for users where:</strong></div>
+          <br/>
+          {% with command="template" name="template:0" %}
+          {% include "actionkit_usersearch/_fields.html" %}
+          {% endwith %}
+          <br /><br /><br />
+          <a class="addSet" onclick="addSet('include', this); return false;"
+             href="#">And...</a>
+        </div>
+
+        <select id="template_country"
+                name="country" data-filtertype="country" multiple="multiple">
+          <option value=""></option>
+          {% for country in countries %}
+          <option value="{{ country }}">{{ country }}</option>
+          {% endfor %}
+        </select>
+        <select id="template_state"
+                name="state" data-filtertype="state" multiple="multiple">
+    <option value=""></option>
+  </select>
+
+  <select id="template_city"
+    name="city" multiple="multiple">
+    <option value=""></option>
+  </select>
+
+  <select id="template_action"
+    name="action" multiple="multiple">
+    <option value=""></option>
+    {% for item in pages %}
+    <option value="{{ item.id }}">
+      {{ item.title }} ({{ item.id }} -- {{ item.name }})
+    </option>
+    {% endfor %}
+  </select>
+
+  <select id="template_source"
+    name="source" data-placeholder="Choose one or more sources"
+    multiple="multiple">
+    {% for item in sources %}
+    <option value="{{item}}">
+      {{item}}
+    </option>
+    {% endfor %}
+  </select>
+
+  <select id="template_tag"
+    name="tag"
+    data-placeholder="Choose one or more tags"
+    multiple="multiple">
+    {% for item in tags %}
+    <option value="{{item.id}}">
+      {{item.name}}
+    </option>
+    {% endfor %}
+  </select>
+
+  {% for clause in where_clauses %}
+  {{ clause.load.render|safe }}
+  {% endfor %}
+
+  <select id="template_language"
+    name="language"
+    multiple="multiple">
+    {% for lang in languages %}
+    <option value="{{lang.id}}">
+      {{lang.name}}
+    </option>
+    {% endfor %}
+  </select>
+
+  <input
+     type="text"
+     id="template_created_before"
+     name="created_before"
+     placeholder="MM/DD/YYYY"
+     />
+
+  <input
+     type="text"
+     id="template_created_after"
+     name="created_after"
+     placeholder="MM/DD/YYYY"
+     />
+
+  <input
+     type="text"
+     id="template_emails_opened"
+     name="emails_opened"
+     data-paired-with="emails_opened__since"
+     />
+
+  <input
+     type="text"
+     id="template_emails_opened__since"
+     name="emails_opened__since"
+     placeholder="MM/DD/YYYY"
+     />
+
+  <input
+     type="text"
+     id="template_contacted_since"
+     name="contacted_since"
+     data-paired-with="contacted_since__contacted_by"
+     placeholder="MM/DD/YYYY"
+     />
+
+  <input type="text"
+	 id="template_contacted_since__contacted_by"
+	 name="contacted_since__contacted_by"
+	 placeholder="Contacted by:"
+	 />
+
+  <input
+     type="text"
+     id="template_contacted_by"
+     name="contacted_by"
+     data-paired-with="contacted_by__contacted_since"
+     placeholder="Contacted by:"
+     />
+
+  <input type="text"
+     id="template_contacted_by__contacted_since"
+     name="contacted_by__contacted_since"
+     placeholder="MM/DD/YYYY"
+     />
+
+  <input
+     type="text"
+     id="template_more_actions"
+     name="more_actions"
+     data-paired-with="more_actions__since"
+     placeholder="More than this number of actions"
+     />
+
+  <input
+     type="text"
+     id="template_more_actions__since"
+     name="more_actions__since"
+     placeholder="MM/DD/YYYY"
+     />
+
+  <input
+     type="text"
+     id="template_donated_more"
+     name="donated_more"
+     data-paired-with="donated_more__since"
+     placeholder="Donated more than"
+     />
+
+  <input
+     type="text"
+     id="template_donated_more__since"
+     name="donated_more__since"
+     placeholder="MM/DD/YYYY"
+     />
+
+  <input
+     type="text"
+     id="template_donated_times"
+     name="donated_times"
+     data-paired-with="donated_times__since"
+     placeholder="Donated more times than"
+     />
+
+  <input
+     type="text"
+     id="template_donated_times__since"
+     name="donated_times__since"
+     placeholder="MM/DD/YYYY"
+     />
+
+  <input
+     id="template_zipcode"
+     type="text"
+     name="zipcode"
+     data-paired-with="zipcode__distance"
+     placeholder="Zip Code"
+     />
+
+  <input
+     id="template_zipcode__distance"
+     type="text"
+     name="zipcode__distance"
+     style="margin-left: 10px"
+     placeholder="Distance in miles"
+     />
+
+  <select
+     id="template_istoggle"
+     type="select"
+     class="istoggle"
+     name="istoggle"
+     style="float: left; width: 75px; margin-right: 5px"
+     >
+     <option value="1">Is</option>
+     <option value="0">Is Not</option>
+   </select>
+
+
+      </div>
+    </div>
+  </fieldset>
+
+  <div id="throbber" style="padding: 25px; text-align: center"></div>
+  <script type="text/javascript">
+    var throbber = new Throbber({"size": 100, "color": "black"})
+      .appendTo( document.getElementById("throbber") )
+      .start();
+  </script>
+
+  <div class="and-group">
+    <br/>
+    <div><strong>Search for users where:</strong></div>
+    <br/>
+    {% with command="include" name="include:0" %}
+    {% include "actionkit_usersearch/_fields.html" %}
+    {% endwith %}
+    <br /><br /><br />
+    <a class="addSet" onclick="addSet('include', this); return false;"
+       href="#">And...</a>
+  </div>
+
+  <a class="addSetOr" onclick="addSetOr('include'); return false;"
+     href="#">Or...</a>
+
+  <br />
+
+  <div class="accordion-group">
+    <div class="accordion-heading">
+      <a href="#" data-target="#search_columns"
+         class="accordion-toggle" data-toggle="collapse">Choose Columns</a>
+    </div>
+    <div id="search_columns" class="accordion-body collapse">
+      {% for column in column_options %}
+      <div style="float: left; border: 1px solid lightgray; border-radius: 5px">
+        <label class="checkbox inline">
+          <input type="checkbox" name="column" {% if column.checked %}checked="checked"{% endif %} value="{{ column.name }}" />
+          {{ column.display_name|default:column.name }}
+        </label>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div style="clear: both;">
+
+    <hr style="border-top: 1px solid gray; border-bottom: none" />
+
+    <label>
+      <input style="display: inline-block;" type="checkbox" name="subscription_all_users" />
+      Include non-subscribed users
+    </label>
+
+    <hr style="border-top: 1px solid gray; border-bottom: none" />
+
+    <input type="submit" class="btn"
+           formaction="{% url 'usersearch_show_counts' %}" 
+           value="Just the counts, please" />
+    <input type="submit" class="btn"
+           formaction="{% url 'usersearch_show_sql' %}" 
+           value="Show raw SQL code" />
+    <input type="submit" class="btn"
+           formaction="{% url 'usersearch_create_report' %}" 
+           value="Get CSV with full results" />
+  </div>
+
+</form>
+</div>
+<br/><br/><br/><br/>
+  <script type="text/javascript" src="/static/jquery/jquery.autocomplete.js"></script>
+  <script type="text/javascript" src="/static/jquery-ui-1.10.2.custom.min.js"></script>
+  <script type="text/javascript">
+    $(window).load(function() {
+      $("body").find('input,button').filter('[formaction!=""][formaction]').on('click', function() {
+        var $this = $(this);
+        $this.closest('form').attr('action', $this.attr('formaction'));
+        return true;
+      });
+
+      throbber.stop();
+      $("#throbber").remove();
+    });
+  </script>
+{% endblock %}
+
+</body>
+</html>
