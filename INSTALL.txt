@@ -2,37 +2,21 @@ The code comes with a simple Django project and Heroku configuration that can be
 to get a hosted version quickly up and running.  The configuration will be suitable
 for demo purposes and for light internal usage.  
 
-Note that HTTPS is a strict requirement for hosting a Raplet.  Adding an HTTPS endpoint
-on Heroku costs $20/month.  Other than that, the application is fully functional on Heroku
-without any additional costs or usage beyond the free tier -- although in several places 
-this involves trading performance for ease of setup.
-
-If you already have a wildcard SSL certificate, are comfortable
-configuring Apache with mod_ssl, and are willing to maintain your own
-WSGI server / database / etc, you can also install the
-application on your own server via Apache/mod_wsgi or another
-configuration with an Apache/mod_ssl HTTPS frontend.  This will likely
-be more cost-effective than Heroku's $20/month SSL endpoint.
-
-That said -- and especially if you are hosting the application
-yourself instead of using Heroku -- if you plan to use this heavily
-(e.g. a large number of simultaneous staff users activating the
-Raplet, or with a custom query that is very database-intensive) I
-recommend examining the configuration and making changes to suit your
-needs.
+If you plan to use this heavily I recommend examining the configuration and making changes 
+to suit your needs.
 
 The Django project will provide:
 
 * A Bootstrap-based base template, a login view, and a homepage
 * All functionality locked down to logged-in users only
-* All logged in users have full access to install and use the Raplet
+* All logged in users have full access to install and use the system
 * Django Flat Pages are installed so you can add your own help pages, etc
 * All site templates can be modified through the web using django-dbtemplates
-* Through-the-web access to Django's Admin Site to manage users, templates, flat pages, and raplet configuration
+* Through-the-web access to Django's Admin Site to manage users, templates, flat pages, and search/detail configuration
 
-The core functionality is provided in an isolated Django app called "actionkit_raplet".  This
-can be integrated into any larger Django project, if the provided Django project does not
-meet your needs.
+The core functionality is provided in two isolated Django apps called "actionkit_usersearch"
+and "actionkit_userdetail".  These can be integrated into any larger Django project, if the 
+provided Django project does not meet your needs.
 
 Quick-Start on Heroku
 =====================
@@ -71,6 +55,27 @@ that your Actionkit database and API connection are properly configured.
 
 == Configuration ==
 
+Through the Django Admin site you can configure the following behaviors:
+ 
+ * /admin/actionkit_usersearch/userpermissions/ -- How many rows of
+   data any given user account may export. (Default is all rows
+   returned in a search, but for some user accounts you may want to
+   limit the size of any given export to e.g. 100 rows.)
+ 
+ * /admin/actionkit_usersearch/selectcolumn/ -- Extra "select" clauses
+   that users may include in their exports.  Options include raw SQL
+   subqueries, particular userfields, and several aggregate
+   clauses. (Documentation and more options hopefully coming soon.)
+
+ * /admin/actionkit_usersearch/whereclause/ -- Extra "where" clauses
+   that users may filter their searches/exports by.  Options include
+   the existence of a particular userfield or a particular value for a
+   userfield.  (Documentation and more options hopefully coming soon.)
+
+ * /admin/actionkit_userdetail/calloutuserfield/ -- Specific
+   userfields that should be displayed in the top section of the user
+   detail page, in addition to being printed in the "User Fields" tab
+   at the bottom of that page.
 
 == Debugging ==
 
